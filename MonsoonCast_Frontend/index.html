@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#08111c" />
+  <title>MonsoonCast — Hyperlocal Monsoon Outlook</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/index.css" />
+</head>
+<body>
+  <header class="app-header">
+    <select id="languageSelect" class="language-select" aria-label="Language" style="width: 85px;">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी</option>
+        <option value="or">ଓଡ଼ିଆ</option>
+    </select>
+    <div style="min-width: 0; flex: 1; padding: 0 10px;">
+      <div class="brand">MonsoonCast</div>
+      <div class="subtitle" data-i18n="subtitle">Panchayat-scale rainfall outlook</div>
+    </div>
+    <div class="header-location">
+      <div class="api-status" id="statusText">OFFLINE</div>
+      <strong id="selectedLocation" data-i18n="selectLocation">Select a location</strong>
+    </div>
+  </header>
+
+  <div id="subscribeModal" class="modal-overlay" hidden>
+    <div class="modal-content card">
+      <h2 data-i18n="subTitle">Daily Advisory</h2>
+      <p data-i18n="subDesc" style="font-size: 0.9em; margin-bottom: 16px; color: var(--text-secondary);">You will receive daily advisory on what is going to happen and what you should do for the next week then next week up to 4th week.</p>
+
+      <div style="margin-bottom: 16px;">
+        <span class="eyebrow" data-i18n="subPlatform">Choose how to receive messages</span>
+        <div style="display: flex; gap: 16px; margin-top: 8px;">
+          <label class="custom-checkbox"><input type="checkbox" id="chkSms" value="sms"> <span>SMS</span></label>
+          <label class="custom-checkbox"><input type="checkbox" id="chkWa" value="wa"> <span>WhatsApp</span></label>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <span class="eyebrow" data-i18n="subCrops">Select crop(s) for updates</span>
+        <div id="subCropsContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;"></div>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label class="eyebrow" for="subPhone" data-i18n="subPhoneLbl">Enter 10-Digit Mobile Number</label>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <input type="tel" id="subPhone" class="search-select" placeholder="9876543210" maxlength="10" autocomplete="off" style="flex: 1;" />
+          <button id="sendOtpBtn" class="secondary-btn" type="button" data-i18n="sendOtp">Send OTP</button>
+        </div>
+      </div>
+
+      <div id="otpSection" style="margin-bottom: 24px;" hidden>
+        <label class="eyebrow" for="subOtp" data-i18n="subOtpLbl">Enter 6-Digit Verification Code</label>
+        <input type="text" id="subOtp" class="search-select" placeholder="123456" maxlength="6" style="margin-top: 8px;" autocomplete="off" />
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button id="cancelSubBtn" class="secondary-btn" type="button" data-i18n="cancel">Cancel</button>
+        <button id="submitSubBtn" class="primary-btn" type="button" data-i18n="submit">Subscribe</button>
+      </div>
+    </div>
+  </div>
+  <div id="langModal" class="modal-overlay" hidden>
+    <div class="modal-content card">
+      <h2>Select Language / भाषा चुनें</h2>
+      <p style="font-size: 0.9em; margin-bottom: 16px; color: var(--text-secondary);">Please select your language to continue.</p>
+      
+      <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px;">
+        <button class="secondary-btn lang-choice-btn" type="button" data-lang="en" style="width: 100%; text-align: left; padding: 12px; font-size: 1rem;">English</button>
+        <button class="secondary-btn lang-choice-btn" type="button" data-lang="hi" style="width: 100%; text-align: left; padding: 12px; font-size: 1rem;">हिन्दी (Hindi)</button>
+        <button class="secondary-btn lang-choice-btn" type="button" data-lang="or" style="width: 100%; text-align: left; padding: 12px; font-size: 1rem;">ଓଡ଼ିଆ (Odia)</button>
+      </div>
+    </div>
+  </div>
+  <main class="app-main">
+    <section class="tab-panel active" id="panel-crops" data-tab="crops">
+      <div class="section-title-row">
+        <div>
+          <span class="eyebrow" data-i18n="startHere">Start here</span>
+          <h1 data-i18n="locationAndCrops">Location & crops</h1>
+        </div>
+      </div>
+
+      <div class="card location-card">
+        <div class="location-card-head">
+          <div>
+            <span class="eyebrow" data-i18n="yourLocation">Your location</span>
+            <strong id="locationStatus" data-i18n="chooseLocationMsg">Choose how to set your location</strong>
+          </div>
+          <span class="location-ready" id="locationReadyBadge" data-i18n="notSelected">Not selected</span>
+        </div>
+
+        <button class="find-location-btn" id="findLocationBtn" type="button">
+          <span class="find-icon">⌖</span>
+          <span>
+            <strong data-i18n="useLocation">Use my location</strong>
+            <small data-i18n="findVillageAuto">Find your current village automatically</small>
+          </span>
+        </button>
+
+        <div class="or-divider"><span data-i18n="orSelectManually">or select manually</span></div>
+
+        <div class="location-form">
+          <label class="field-label" for="stateInput" data-i18n="state">State</label>
+          <input id="stateInput" class="search-select" list="stateOptions" placeholder="Type or choose a state" autocomplete="off" />
+          <datalist id="stateOptions"></datalist>
+
+          <label class="field-label" for="districtInput" data-i18n="district">District</label>
+          <input id="districtInput" class="search-select" list="districtOptions" placeholder="Choose a district" autocomplete="off" disabled />
+          <datalist id="districtOptions"></datalist>
+
+          <label class="field-label" for="blockInput" data-i18n="block">Block / Sub-district</label>
+          <input id="blockInput" class="search-select" list="blockOptions" placeholder="Choose a block" autocomplete="off" disabled />
+          <datalist id="blockOptions"></datalist>
+
+          <label class="field-label" for="panchayatInput" data-i18n="panchayat">Panchayat / Village</label>
+          <input id="panchayatInput" class="search-select" list="panchayatOptions" placeholder="Choose a panchayat / village" autocomplete="off" disabled />
+          <datalist id="panchayatOptions"></datalist>
+
+          <div class="selected-place card-subtle" id="selectedPlaceDetails" hidden>
+            <span class="eyebrow" data-i18n="selectedPlace">Selected place</span>
+            <strong id="selectedPlaceText">—</strong>
+            <span id="selectedCoordsText">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card crop-selector-card">
+        <div>
+          <span class="eyebrow" data-i18n="chooseCrop">Choose a crop</span>
+          <h2 data-i18n="cropAdvisory">Crop advisory</h2>
+          <p data-i18n="cropAdvisoryDesc">Selecting a crop will generate its advisory from the 30-day outlook for your selected location.</p>
+        </div>
+        <label class="field-label" for="cropInput" data-i18n="crop">Crop</label>
+        <input id="cropInput" class="search-select crop-input" list="cropOptions" placeholder="Select a crop" autocomplete="off" disabled />
+        <button id="messageMeBtn" class="find-location-btn" type="button" disabled style="margin-top: 12px; justify-content: center;">
+          <span class="find-icon">💬</span>
+          <strong data-i18n="messageMeBtn">Message Me</strong>
+        </button>
+        <datalist id="cropOptions"></datalist>
+        <div class="crop-lock-note" id="cropLockNote" data-i18n="selectLocFirst">Select your location first.</div>
+      </div>
+
+      <div id="cropList" class="crop-list"></div>
+
+      <div class="card crop-intro">
+        <p data-i18n="cropIntroText">Location names are loaded from the selected state's administrative dataset. The final place is geocoded only after you choose it; the selected coordinates are then sent to the forecast backend.</p>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-day" data-tab="day">
+      <div class="section-title-row">
+        <div>
+          <span class="eyebrow" data-i18n="every3Hours">Every 3 hours</span>
+          <h1 data-i18n="dayForecast">Day forecast</h1>
+        </div>
+        <select id="dateSelect" class="compact-select" aria-label="Forecast day" disabled></select>
+      </div>
+
+      <div class="location-required card" id="dayLocationRequired">
+        <strong data-i18n="selectLocInCrops">Select your location in Crops first.</strong>
+        <p data-i18n="dayForecastAppear">The day forecast will appear here after the forecast and outlook have finished loading.</p>
+      </div>
+
+      <div id="dayForecastContent" hidden>
+        <div class="day-summary card">
+          <div class="day-summary-main">
+            <span id="dayRainLabel" data-i18n="rainAtSelectedTime">Rain at selected time</span>
+            <strong id="dayRainValue">— mm</strong>
+          </div>
+          <div class="rain-class" id="rainClass">—</div>
+        </div>
+
+        <div class="card hourly-card">
+          <div class="hourly-head">
+            <div>
+              <span class="eyebrow" data-i18n="threeHourForecast">3-hour forecast</span>
+              <strong data-i18n="tapATime">Tap a time</strong>
+            </div>
+            <div class="lead-chip" id="leadTime">+0h</div>
+          </div>
+          <div class="hourly-scroll" id="hourlyForecast" role="list" aria-label="Three hour forecast"></div>
+        </div>
+
+        <div class="metric-grid day-metrics">
+          <article class="metric card"><span data-i18n="threeHourRain">3-hour rain</span><strong id="metric3h">— mm</strong></article>
+          <article class="metric card"><span data-i18n="next24h">Next 24h</span><strong id="metric24h">— mm</strong></article>
+          <article class="metric card"><span data-i18n="rainProb">Rain probability</span><strong id="metricProbability">—%</strong></article>
+          <article class="metric card"><span data-i18n="dryRisk">Dry-spell risk</span><strong id="metricDryRisk">—%</strong></article>
+        </div>
+
+        <div class="card detail-card">
+          <div class="card-title" data-i18n="rainfallOutlook">Rainfall outlook</div>
+          <p id="dayDescription" data-i18n="chooseForecastDay">Choose a forecast day and tap a 3-hour window.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-all-days" data-tab="all-days">
+      <div class="section-title-row">
+        <div>
+          <span class="eyebrow" data-i18n="thirtyDayOverview">30-day overview</span>
+          <h1 data-i18n="allDays">All days</h1>
+        </div>
+      </div>
+
+      <div class="location-required card" id="allDaysLocationRequired">
+        <strong data-i18n="selectLocInCrops">Select your location in Crops first.</strong>
+        <p data-i18n="thirtyDaySummaryAppear">The 30-day rainfall summary will appear here after your location is ready.</p>
+      </div>
+
+      <div id="allDaysContent" hidden>
+        <div class="overview-grid">
+          <article class="overview-card card"><span data-i18n="totalRain">Total rain</span><strong id="overviewTotalRain">— mm</strong></article>
+          <article class="overview-card card"><span data-i18n="aboveAvgDays">Above-average days</span><strong id="overviewWetDays">—</strong></article>
+          <article class="overview-card card"><span data-i18n="drySpellDays">Break / dry-spell days</span><strong id="overviewDryDays">—</strong></article>
+          <article class="overview-card card"><span data-i18n="heavyRainDays">Heavy-rain days</span><strong id="overviewHeavyDays">—</strong></article>
+        </div>
+
+        <div class="card summary-note">
+          <span class="eyebrow" data-i18n="overallPattern">Overall pattern</span>
+          <strong id="overallPattern">—</strong>
+          <p id="overallPatternDetail" data-i18n="loadingThirtyDaySummary">Loading the 30-day rainfall summary…</p>
+        </div>
+
+        <div class="daily-list" id="dailyList"></div>
+      </div>
+    </section>
+
+    <section class="tab-panel map-panel" id="panel-map" data-tab="map">
+      <div class="map-topbar">
+        <div>
+          <span class="eyebrow" data-i18n="sixKmRainfall">6 km rainfall field</span>
+          <h1 data-i18n="map">Map</h1>
+        </div>
+        <select id="mapLeadBucket" class="compact-select" style="width: auto; margin: 0 10px;">
+          <option value="7d" data-i18n="week1">Week 1</option>
+          <option value="14d" data-i18n="week2">Week 2</option>
+          <option value="21d" data-i18n="week3">Week 3</option>
+          <option value="30d" data-i18n="week4">Week 4</option>
+        </select>
+        <button class="map-control" id="mapReset" type="button" data-i18n="reset">Reset</button>
+      </div>
+      <div class="map-wrapper card">
+        <div id="map"></div>
+        <div class="map-overlay-info" id="mapOverlayInfo">Risk map · 7d outlook</div>
+        <div class="rain-legend">
+          <span style="background:#4575b4" class="legend-dot"></span><span data-i18n="legendOnset">Onset</span>
+          <span style="background:#1a9850" class="legend-dot"></span><span data-i18n="legendActive">Active</span>
+          <span style="background:#d73027" class="legend-dot"></span><span data-i18n="legendBreak">Break</span>
+          <span style="background:#91bfdb" class="legend-dot"></span><span data-i18n="legendRevival">Revival</span>
+        </div>
+      </div>
+      <div class="card map-note">
+        <span class="eyebrow" data-i18n="mapBehavior">Map behavior</span>
+        <p data-i18n="mapBehaviorText">The map uses the precomputed GeoJSON risk field. Farmer weather and advisory requests remain location-specific.</p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-tabs" aria-label="Main navigation">
+    <button class="tab-btn active" data-tab="crops"><span class="tab-icon">⌁</span><span data-i18n="crops">Crops</span></button>
+    <button class="tab-btn" data-tab="day"><span class="tab-icon">◷</span><span data-i18n="day">Day</span></button>
+    <button class="tab-btn" data-tab="all-days"><span class="tab-icon">▤</span><span data-i18n="allDays">All days</span></button>
+    <button class="tab-btn" data-tab="map"><span class="tab-icon">⌖</span><span data-i18n="map">Map</span></button>
+  </nav>
+
+  <script src="cordova.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/index.js"></script>
+</body>
+</html>
