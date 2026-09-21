@@ -1,4 +1,4 @@
-const API_BASE = window.MONSOON_API_BASE || "https://broadness-uncouth-pruning.ngrok-free.dev";
+const API_BASE = window.MONSOON_API_BASE || "https://your_url.ngrok-free.dev";
 
 const CROPS = ["Rice", "Cotton", "Soybean", "Pigeon pea (Arhar)"];
 const LEAD_BUCKETS = ["7d", "14d", "21d", "30d"];
